@@ -4,7 +4,7 @@ Prevents accidental reload/closing of temporary ChatGPT chats by showing a confi
 
 ## Install
 1. Install Tampermonkey extension (Chrome/Firefox/Edge)
-2. Click to install: [**Install Script**](https://github.com/xryndelub/chatgpt-temp-chat-guard/raw/refs/heads/main/chatgpt-temp-chat-guard.user.js)
+2. Click to install: [**Install Script**](https://github.com/ilyassov-d/chatgpt-temp-chat-guard/raw/refs/heads/main/chatgpt-temp-chat-guard.user.js)
 3. Tampermonkey will open an installation page.
 4. Click **Install** in Tampermonkey.
 
