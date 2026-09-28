@@ -6,6 +6,8 @@
 // @match        https://chatgpt.com/*
 // @grant        none
 // @run-at       document-start
+// @updateURL    https://raw.githubusercontent.com/ilyassov-d/chatgpt-temp-chat-guard/main/chatgpt-temp-chat-guard.user.js
+// @downloadURL  https://raw.githubusercontent.com/ilyassov-d/chatgpt-temp-chat-guard/main/chatgpt-temp-chat-guard.user.js
 // ==/UserScript==
 
 (function () {
