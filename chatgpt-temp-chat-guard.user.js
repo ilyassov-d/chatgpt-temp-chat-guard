@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT Temporary Chat Tab Protection
 // @namespace    http://tampermonkey.net/
-// @version      3.0
-// @description  Prevent accidental reload/closing of temporary ChatGPT chats
+// @version      4.0
+// @description  Prevent accidental reload/closing of ChatGPT temporary chats
 // @match        https://chatgpt.com/*
 // @grant        none
 // @run-at       document-start
@@ -11,85 +11,125 @@
 (function () {
     'use strict';
 
-    let unloadAttached = false;
-    let lastPath = location.pathname;
+    let guardAttached = false;
+    let lastUrl = location.href;
 
+    function beforeUnloadHandler(event) {
+        if (!isTemporaryChat()) return;
+
+        event.preventDefault();
+
+        event.returnValue = '';
+
+        return '';
+    }
+
+    function isTemporaryChat() {
+        const url = new URL(location.href);
+
+        if (url.searchParams.get('temporary-chat') === 'true') {
+            return true;
+        }
+
+        /*
+         * Fallback:
+         * ChatGPT may remove/change the query parameter after client-side
+         * navigation while still showing the temporary-chat UI.
+         *
+         * Look for visible UI text associated with temporary chat.
+         */
+        const bodyText = document.body?.innerText || '';
+
+        const hasTemporaryChatUI =
+            /\btemporary chat\b/i.test(bodyText) ||
+            /this chat won['’]t appear in history/i.test(bodyText);
+        
+        const isSavedConversation =
+            /^\/c\/[^/]+/.test(url.pathname);
+
+        return hasTemporaryChatUI && !isSavedConversation;
+    }
+
+    function attachGuard() {
+        if (guardAttached) return;
+
+        window.addEventListener('beforeunload', beforeUnloadHandler, {
+            capture: true
+        });
+
+        guardAttached = true;
+
+        console.log('[Temp Chat Guard] protection enabled');
+    }
+
+    function detachGuard() {
+        if (!guardAttached) return;
+
+        window.removeEventListener(
+            'beforeunload',
+            beforeUnloadHandler,
+            { capture: true }
+        );
+
+        guardAttached = false;
+
+        console.log('[Temp Chat Guard] protection disabled');
+    }
+
+    function updateGuard() {
+        if (isTemporaryChat()) {
+            attachGuard();
+        } else {
+            detachGuard();
+        }
+    }
+
+    function handleUrlChange() {
+        if (location.href === lastUrl) return;
+
+        lastUrl = location.href;
+
+        queueMicrotask(updateGuard);
+        setTimeout(updateGuard, 100);
+        setTimeout(updateGuard, 500);
+    }
 
     const originalPushState = history.pushState;
     const originalReplaceState = history.replaceState;
 
-    function triggerUrlChange() {
-        const newPath = location.pathname;
-        if (newPath !== lastPath) {
-            lastPath = newPath;
-            checkAndApplyGuard();
-        }
-    }
-
-    history.pushState = function () {
-        originalPushState.apply(this, arguments);
-        triggerUrlChange();
+    history.pushState = function (...args) {
+        const result = originalPushState.apply(this, args);
+        handleUrlChange();
+        return result;
     };
 
-    history.replaceState = function () {
-        originalReplaceState.apply(this, arguments);
-        triggerUrlChange();
+    history.replaceState = function (...args) {
+        const result = originalReplaceState.apply(this, args);
+        handleUrlChange();
+        return result;
     };
 
-    window.addEventListener('popstate', () => {
-        triggerUrlChange();
-    });
+    window.addEventListener('popstate', handleUrlChange);
 
-    const observer = new MutationObserver(() => {
-        triggerUrlChange();
-    });
-
-    window.addEventListener('load', () => {
-        observer.observe(document.body, { childList: true, subtree: true });
-        checkAndApplyGuard();
-    });
-
-    function isTemporaryChat() {
-        const path = location.pathname;
-        const isSaved = path.startsWith('/c/');
-        const isTemp =
-            path === '/' ||
-            path === '/chat' ||
-            path === '/chat/' ||
-            path === '/chat/new' ||
-            path === '/#';
-
-        return !isSaved && isTemp;
-    }
-
-    function attachUnloadGuard() {
-        if (!unloadAttached) {
-            window.addEventListener('beforeunload', beforeUnloadHandler);
-            unloadAttached = true;
+    function startObserver() {
+        if (!document.documentElement) {
+            requestAnimationFrame(startObserver);
+            return;
         }
+
+        const observer = new MutationObserver(() => {
+            handleUrlChange();
+            updateGuard();
+        });
+
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+
+        updateGuard();
     }
 
-    function detachUnloadGuard() {
-        if (unloadAttached) {
-            window.removeEventListener('beforeunload', beforeUnloadHandler);
-            unloadAttached = false;
-        }
-    }
-
-    function beforeUnloadHandler(e) {
-        if (isTemporaryChat()) {
-            e.preventDefault();
-            e.returnValue = '';
-            return '';
-        }
-    }
-
-    function checkAndApplyGuard() {
-        if (isTemporaryChat()) {
-            attachUnloadGuard();
-        } else {
-            detachUnloadGuard();
-        }
-    }
+    startObserver();
 
 })();
